@@ -4,7 +4,8 @@
 
 # EcoTradeX – Real-Time Stock Tracking Dashboard
 
-EcoTradeX is a full-stack web application that displays real-time stock price updates using WebSockets.
+EcoTradeX is a web application that shows real-time stock price updates using WebSockets.
+It offers a responsive interface with instant data refresh for live market monitoring
 
 ---
 
