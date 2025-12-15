@@ -35,6 +35,15 @@ EcoTradeX allows users to:
 - Responsive and clean interface  
 
 ---
+## Multi-User Functionality
+
+EcoTradeX supports multiple users simultaneously using WebSocket communication powered by Socket.IO.
+
+Each user who opens the application establishes a unique socket connection with the server. The backend assigns a distinct socket ID to every user, allowing the system to track users independently.
+
+When users subscribe to specific stocks, their selections are stored against their socket connection. The server sends real-time price updates only for the stocks each user has subscribed to, ensuring personalized data delivery.
+
+When a user disconnects, their socket session and subscriptions are automatically cleared, allowing smooth handling of multiple concurrent users without data conflicts.
 
 ## Technology Stack
 
