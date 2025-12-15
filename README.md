@@ -9,12 +9,8 @@ EcoTradeX is a full-stack web application that displays real-time stock price up
 ---
 
 ## Live Demo
-
-Frontend:  
-https://ecotradex-4acd.onrender.com
-
-Backend:  
-https://ecotradex-backend.onrender.com
+ 
+https://ecotradex-4acd.onrender.co
 
 ---
 
@@ -58,4 +54,14 @@ EcoTradeX allows users to:
 ---
 
 
+### Backend and Frontend commands
+
+```bash
+cd backend
+npm install
+node server.js
 ---
+cd client-react
+npm install
+npm run dev
+
