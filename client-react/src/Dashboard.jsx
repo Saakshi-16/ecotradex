@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 import "./style.css";
 import { Sparklines, SparklinesLine, SparklinesSpots } from "react-sparklines";
 
-const SERVER_URL = "http://localhost:4000";
+const SERVER_URL = "https://ecotradex-backend.onrender.com";
 const STOCKS = ["GOOG", "TSLA", "AMZN", "META", "NVDA"];
 
 export default function Dashboard({ email, theme }) {
@@ -16,65 +16,84 @@ export default function Dashboard({ email, theme }) {
   const [history, setHistory] = useState({});
   const [status, setStatus] = useState("Connecting...");
 
-  // create socket once
+  /* ===============================
+     CREATE SOCKET (ONCE PER USER)
+     =============================== */
   useEffect(() => {
-    const s = io(SERVER_URL);
+    const s = io(SERVER_URL, {
+      transports: ["websocket"], // 🔥 CRITICAL FIX
+    });
 
     s.on("connect", () => {
       setStatus("Connected to server");
       s.emit("login", email);
     });
 
-    s.on("disconnect", () => setStatus("Disconnected from server"));
+    s.on("disconnect", () => {
+      setStatus("Disconnected from server");
+    });
 
     setSocket(s);
     return () => s.disconnect();
   }, [email]);
 
-  // handle incoming prices
+  /* ===============================
+     HANDLE PRICE UPDATES
+     =============================== */
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("price_update", (newData) => {
-      let updatedFlash = {};
-      const updatedHistory = { ...history };
+    const handlePrices = (newData) => {
+      setPrices((prev) => {
+        const updatedFlash = {};
+        const updatedHistory = { ...history };
 
-      Object.keys(newData).forEach((ticker) => {
-        const oldPrice = prices[ticker];
-        const newPrice = newData[ticker];
+        Object.keys(newData).forEach((ticker) => {
+          const oldPrice = prev[ticker];
+          const newPrice = newData[ticker];
 
-        if (oldPrice !== undefined) {
-          if (newPrice > oldPrice) updatedFlash[ticker] = "flash-up";
-          else if (newPrice < oldPrice) updatedFlash[ticker] = "flash-down";
-        }
+          if (oldPrice !== undefined) {
+            if (newPrice > oldPrice) updatedFlash[ticker] = "flash-up";
+            else if (newPrice < oldPrice) updatedFlash[ticker] = "flash-down";
+          }
 
-        if (!updatedHistory[ticker]) updatedHistory[ticker] = [];
-        updatedHistory[ticker].push(newPrice);
-        if (updatedHistory[ticker].length > 20) updatedHistory[ticker].shift();
+          if (!updatedHistory[ticker]) updatedHistory[ticker] = [];
+          updatedHistory[ticker].push(newPrice);
+          if (updatedHistory[ticker].length > 20) {
+            updatedHistory[ticker].shift();
+          }
+        });
+
+        setPrevPrices(prev);
+        setFlash(updatedFlash);
+        setHistory(updatedHistory);
+
+        setTimeout(() => setFlash({}), 500);
+        setStatus("Last update: " + new Date().toLocaleTimeString());
+
+        return newData;
       });
+    };
 
-      setPrevPrices(prices);
-      setFlash(updatedFlash);
-      setPrices(newData);
-      setHistory(updatedHistory);
+    socket.on("price_update", handlePrices);
+    return () => socket.off("price_update", handlePrices);
+  }, [socket, history]);
 
-      setTimeout(() => setFlash({}), 500);
-      setStatus("Last update: " + new Date().toLocaleTimeString());
-    });
-
-    return () => socket.off("price_update");
-  }, [socket, prices, history]);
-
-  // subscribe toggles
+  /* ===============================
+     SUBSCRIBE / UNSUBSCRIBE
+     =============================== */
   const toggleStock = (ticker) => {
     const updated = selected.includes(ticker)
       ? selected.filter((t) => t !== ticker)
       : [...selected, ticker];
+
     setSelected(updated);
-    if (socket) socket.emit("subscribe", updated);
+    socket?.emit("subscribe", updated);
   };
 
-  // compute gainers/losers from selected stocks (use price diff from prevPrices)
+  /* ===============================
+     TOP GAINER / LOSER
+     =============================== */
   const topMovers = useMemo(() => {
     const diffs = [];
     selected.forEach((t) => {
@@ -86,9 +105,10 @@ export default function Dashboard({ email, theme }) {
       }
     });
     diffs.sort((a, b) => b.percent - a.percent);
-    const topGainer = diffs[0] || null;
-    const topLoser = diffs[diffs.length - 1] || null;
-    return { topGainer, topLoser };
+    return {
+      topGainer: diffs[0] || null,
+      topLoser: diffs[diffs.length - 1] || null,
+    };
   }, [selected, prevPrices, prices]);
 
   const getChangeInfo = (ticker) => {
@@ -102,6 +122,9 @@ export default function Dashboard({ email, theme }) {
     return <span className="neutral">0.00%</span>;
   };
 
+  /* ===============================
+     UI
+     =============================== */
   return (
     <div className="dashboard-layout">
       <div className="left-col">
@@ -189,12 +212,11 @@ export default function Dashboard({ email, theme }) {
                   <td className="ticker-col">{ticker}</td>
 
                   <td className="trend-col">
-                    {history[ticker] && history[ticker].length > 1 ? (
+                    {history[ticker]?.length > 1 ? (
                       <Sparklines
                         data={history[ticker]}
                         width={120}
                         height={40}
-                        margin={5}
                       >
                         <SparklinesLine
                           color={theme === "light" ? "#2ecc71" : "#00ff96"}
@@ -208,7 +230,7 @@ export default function Dashboard({ email, theme }) {
                   </td>
 
                   <td className="price-col">
-                    <div className="price-value">{prices[ticker] || "—"}</div>
+                    <div className="price-value">{prices[ticker] ?? "—"}</div>
                     <div className="price-meta">{getChangeInfo(ticker)}</div>
                   </td>
                 </tr>
